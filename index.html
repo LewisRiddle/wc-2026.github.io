@@ -172,6 +172,20 @@ dialog::backdrop{background:rgba(10,26,47,.45)}
 .foot{margin-top:30px;border-top:1px solid var(--line);padding-top:14px;font-size:12px;color:var(--ink-soft)}
 @media (max-width:560px){.status{margin-left:0;text-align:left;width:100%}.pts{font-size:20px}.rank{font-size:22px}}
 @media (prefers-reduced-motion:reduce){.bar{transition:none}.dot{animation:none}}
+/* ---- TV / kiosk mode ---- */
+body.tv{font-size:18px}
+body.tv .wrap{max-width:1400px}
+body.tv .brand{font-size:clamp(40px,5vw,64px)}
+body.tv .lane{padding:14px 18px}
+body.tv .rank{font-size:34px}
+body.tv .pts{font-size:32px}
+body.tv .nm{font-size:19px}
+body.tv .pg th,body.tv .pg td{padding:9px 11px;font-size:14px}
+body.tv .gridwrap{max-height:64vh}
+.tvbar{position:fixed;left:0;top:0;height:4px;background:var(--pitch);width:0;z-index:50;box-shadow:0 0 8px rgba(26,181,203,.6)}
+.tvtag{display:none;align-self:center;font:800 11px Inter;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--pitch-dark);border:1px solid var(--pitch);border-radius:999px;padding:5px 12px;cursor:pointer}
+body.tv .tvtag{display:inline-block}
 </style>
 </head>
 <body>
@@ -191,6 +205,7 @@ dialog::backdrop{background:rgba(10,26,47,.45)}
 
   <div class="livewrap" id="livewrap"></div>
 
+  <div class="tvbar" id="tvbar"></div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-standings" aria-selected="true" aria-controls="panel-standings">Standings</button>
     <button class="tab" role="tab" id="tab-grid" aria-selected="false" aria-controls="panel-grid">Everyone's picks</button>
@@ -199,6 +214,7 @@ dialog::backdrop{background:rgba(10,26,47,.45)}
     <button class="tab" role="tab" id="tab-tb" aria-selected="false" aria-controls="panel-tb">Tie-breakers</button>
     <button class="tab" role="tab" id="tab-pools" aria-selected="false" aria-controls="panel-pools">Pools</button>
     <button class="tab" role="tab" id="tab-rank" aria-selected="false" aria-controls="panel-rank">World ranking</button>
+      <span class="tvtag" id="tvtag">TV mode</span>
   </nav>
 
   <section id="panel-standings" role="tabpanel">
@@ -553,14 +569,50 @@ function rerender(){renderStatus();renderLive();renderRace();renderGrid();render
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
 const tabs=[['tab-standings','panel-standings'],['tab-grid','panel-grid'],['tab-fixtures','panel-fixtures'],['tab-proj','panel-proj'],['tab-tb','panel-tb'],['tab-pools','panel-pools'],['tab-rank','panel-rank']];
-tabs.forEach(([t,pn])=>document.getElementById(t).addEventListener('click',()=>{
-  tabs.forEach(([tt,pp])=>{document.getElementById(tt).setAttribute('aria-selected', tt===t);document.getElementById(pp).hidden = pp!==pn;});
-  if(pn==='panel-proj') renderProj();
-  if(pn==='panel-tb') renderTB();
-  if(pn==='panel-grid') setTimeout(scrollGridToCurrent,40);
-  if(pn==='panel-pools') renderPools();
-  if(pn==='panel-rank') renderRank();
-}));
+function showTab(pn){
+  tabs.forEach(([tt,pp])=>{document.getElementById(tt).setAttribute('aria-selected', pp===pn);document.getElementById(pp).hidden = pp!==pn;});
+  try{
+    if(pn==='panel-proj') renderProj();
+    else if(pn==='panel-tb') renderTB();
+    else if(pn==='panel-grid') setTimeout(scrollGridToCurrent,40);
+    else if(pn==='panel-pools') renderPools();
+    else if(pn==='panel-rank') renderRank();
+  }catch(e){ console.warn('render failed for',pn,e); }
+}
+tabs.forEach(([t,pn])=>document.getElementById(t).addEventListener('click',()=>{ stopTV(); showTab(pn); }));
+
+/* ---- TV mode: auto-rotate every tab on a timer + drift the grid ---- */
+const TV = location.hash.toLowerCase().includes('tv');
+let tvTimer=null, tvRAF=null, gridDrift=null, tvIdx=0;
+const TV_SEQUENCE=[['panel-standings',12000],['panel-grid',16000],['panel-proj',12000],
+  ['panel-pools',10000],['panel-rank',9000],['panel-tb',9000],['panel-fixtures',11000]];
+function tvStep(){
+  const [pn,ms]=TV_SEQUENCE[tvIdx];
+  tvIdx=(tvIdx+1)%TV_SEQUENCE.length;
+  clearTimeout(tvTimer);
+  tvTimer=setTimeout(tvStep, ms);          // schedule next FIRST: a bad tab can never stall the loop
+  try{ showTab(pn); if(pn==='panel-grid') startGridDrift(ms); }catch(e){ console.warn('TV tab failed',pn,e); }
+  const bar=document.getElementById('tvbar'); const t0=performance.now();
+  cancelAnimationFrame(tvRAF);
+  (function tick(now){ const p=Math.min(1,(now-t0)/ms); if(bar) bar.style.width=(p*100)+'%';
+    if(p<1) tvRAF=requestAnimationFrame(tick); })(t0);
+}
+function startGridDrift(ms){
+  const wrap=document.getElementById('grid'); if(!wrap) return;
+  clearInterval(gridDrift);
+  setTimeout(scrollGridToCurrent,60);
+  gridDrift=setInterval(()=>{
+    if(document.getElementById('panel-grid').hidden){clearInterval(gridDrift);return;}
+    const max=wrap.scrollHeight-wrap.clientHeight;
+    if(wrap.scrollTop>=max-2){clearInterval(gridDrift);return;}
+    wrap.scrollTop+=1;
+  }, Math.max(25, ms/Math.max(1,(wrap.scrollHeight-wrap.clientHeight))));
+}
+function startTV(){ document.body.classList.add('tv'); tvIdx=0; tvStep(); }
+function stopTV(){ document.body.classList.remove('tv'); clearTimeout(tvTimer); cancelAnimationFrame(tvRAF);
+  clearInterval(gridDrift); const b=document.getElementById('tvbar'); if(b) b.style.width='0'; }
+document.getElementById('tvtag').addEventListener('click',()=>{ document.body.classList.contains('tv')?stopTV():startTV(); });
+if(TV){ document.body.classList.add('tv'); if(document.readyState==='complete') setTimeout(startTV,300); else window.addEventListener('load',()=>setTimeout(startTV,300)); }
 document.getElementById('card-close').onclick=()=>document.getElementById('card').close();
 
 async function loadResults(){
