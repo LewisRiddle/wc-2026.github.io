@@ -189,9 +189,26 @@ body.tv .gridwrap{max-height:64vh}
 .tvtag{display:none;align-self:center;font:800 11px Inter;letter-spacing:.12em;text-transform:uppercase;
   color:var(--pitch-dark);border:1px solid var(--pitch);border-radius:999px;padding:5px 12px;cursor:pointer}
 body.tv .tvtag{display:inline-block}
+
+/* boot loading overlay */
+#boot{position:fixed;inset:0;z-index:200;background:var(--paper);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;transition:opacity .45s ease}
+#boot.hide{opacity:0;pointer-events:none}
+#boot .borbit{position:relative;width:64px;height:64px}
+#boot .borbit::before{content:"";position:absolute;inset:0;border:3px solid var(--line);border-top-color:var(--pitch);border-radius:50%;animation:spin .9s linear infinite}
+#boot .borbit::after{content:"";position:absolute;inset:20px;background:var(--ink);border-radius:50%}
+#boot .bt{font:800 13px Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+#boot .bs{font:500 12.5px Inter;color:var(--ink-soft);margin-top:-8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#boot .borbit::before{animation:none}}
 </style>
 </head>
 <body>
+<div id="boot">
+  <div class="borbit"></div>
+  <div class="bt">OrbitRemit WC 2026</div>
+  <div class="bs">Loading the latest scores…</div>
+</div>
 <div class="wrap">
   <header class="top">
     <div class="brandrow">
@@ -831,8 +848,16 @@ function renderLive(){
 }
 
 document.getElementById('foot').innerHTML='<b style="color:#92400E">Late</b> = joined after the tournament kicked off (full picks counted by commissioner\u2019s call). Scoring: Group 3, Round of 32 5, Round of 16 7, Quarter 10, Semi 14, Third 6, Final 20. A correct draw scores the same as a correct win. AI Picks rides along as a benchmark, not a paying entrant. \uD83E\uDD16 = AI benchmark column.<br><b style="color:var(--pitch-dark)">OrbitRemit</b> &middot; Making it Count.';
-loadResults();
-pollESPN(true);                       // backfill any finished games on first load
+function hideBoot(){ const b=document.getElementById('boot'); if(b&&!b.classList.contains('hide')){ b.classList.add('hide'); setTimeout(()=>{ if(b.parentNode) b.parentNode.removeChild(b); },500); } }
+(async function boot(){
+  try{
+    await loadResults();                                   // our results.json backstop
+    await Promise.race([ pollESPN(true),                   // first live backfill from ESPN
+                         new Promise(r=>setTimeout(r,10000)) ]);
+  }catch(e){}
+  hideBoot();
+})();
+setTimeout(hideBoot, 12000);                               // safety net if the feed is unreachable
 // odds now come from the ESPN feed (DraftKings) captured during pollESPN
 (function loop(){ setTimeout(()=>{ pollESPN(false).finally(loop); }, LIVE.length? 45000 : 120000); })();
 if(!ADMIN) setInterval(loadResults, 60000);
