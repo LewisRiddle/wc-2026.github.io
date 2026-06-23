@@ -148,6 +148,11 @@ table.pg{border-collapse:separate;border-spacing:0;width:max-content;min-width:1
 .fx .pend{font:600 11px Inter;color:var(--ink-soft)}
 .fx .gotit{display:block;font-size:10.5px;color:var(--ink-soft)}
 .drawpill{font:700 10px Inter;color:var(--ink);background:#FBE7A3;border-radius:5px;padding:1px 6px}
+.fx.fxdone{border-left:4px solid var(--pitch);background:linear-gradient(90deg,var(--hitbg),var(--card) 38%)}
+.fx .ft{font:800 10px Inter;letter-spacing:.06em;color:#fff;background:var(--pitch);border-radius:5px;padding:2px 7px;flex:none}
+.fx .scline{font:800 13px Inter;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin-left:4px}
+.fx.fxdone .res{color:var(--pitch-dark)}
+.fxnow{box-shadow:0 0 0 2px var(--pitch)}
 .adminbar{background:#0A1A2F;color:#fff;border-radius:12px;padding:14px 16px;margin-bottom:18px}
 .adminbar h3{margin:0 0 4px;font:800 13px Inter;letter-spacing:.06em;text-transform:uppercase}
 .adminbar p{margin:0;font-size:12.5px;color:#AEBBD0}
@@ -404,6 +409,17 @@ function currentMatchN(){
   for(const f of FIX){ if(!RESULTS[f.n]) return f.n; }
   return null;
 }
+function scrollFixturesToLatest(){
+  const host=document.getElementById('fixtures'); if(!host) return;
+  let targetN=null;
+  for(const f of FIX){ if(RESULTS[f.n]) targetN=f.n; }
+  if(targetN===null){ for(const f of FIX){ if(!RESULTS[f.n]){ targetN=f.n; break; } } }
+  if(targetN===null) return;
+  const el=host.querySelector('.fx[data-n="'+targetN+'"]'); if(!el) return;
+  host.querySelectorAll('.fxnow').forEach(x=>x.classList.remove('fxnow'));
+  el.classList.add('fxnow');
+  el.scrollIntoView({block:'center'});
+}
 function scrollGridToCurrent(){
   const wrap=document.getElementById('grid'); if(!wrap) return;
   const tbl=wrap.querySelector('table'); if(!tbl) return;
@@ -427,13 +443,15 @@ function renderFixtures(){
     const side= res? (res==='Draw'?'D': res===f.home?'H':'A') : null;
     let gotit='';
     if(res){const n=PLAYERS.filter(p=>p.picks[String(f.n)]===res).length;gotit='<span class="gotit">'+n+' of '+PLAYERS.length+' called it</span>';}
-    const fx=document.createElement('div');fx.className='fx';
+    const fx=document.createElement('div');fx.className='fx'+(res?' fxdone':'');
+    fx.dataset.n=f.n;
     const hw=side==='H'?' win':'', aw=side==='A'?' win':'';
     const sc=SCORES[f.n];
     fx.innerHTML='<div class="gp">'+(f.group||'')+'</div>'+
+      (res?'<span class="ft">\u2714 FT</span>':'')+
       '<div class="teams"><span class="t'+hw+'">'+flagImg(f.home,20)+esc(f.home)+'</span><span class="vs">v</span><span class="t'+aw+'">'+flagImg(f.away,20)+esc(f.away)+'</span>'+
-      (res==='Draw'?' <span class="drawpill">Draw</span>':'')+'</div>'+
-      '<div class="meta">'+(res?'<span class="res">Final'+(sc?' &middot; '+esc(sc):'')+'</span>':'<span class="pend">'+timeShort(f.date)+'</span>')+gotit+
+      (res==='Draw'?' <span class="drawpill">Draw</span>':'')+(sc?' <span class="scline">'+esc(sc)+'</span>':'')+'</div>'+
+      '<div class="meta">'+(res?'<span class="res">Full time</span>':'<span class="pend">'+timeShort(f.date)+'</span>')+gotit+
       (!res&&ODDS[f.n]?'<span class="gotit">TAB: '+[ODDS[f.n].h,ODDS[f.n].d,ODDS[f.n].a].map(x=>x?x.toFixed(2):'\u2013').join(' / ')+'</span>':'')+'</div>';
     host.appendChild(fx);
     if(ADMIN) fx.appendChild(adminSeg(f));
@@ -669,6 +687,7 @@ function showTab(pn){
     if(pn==='panel-proj') renderProj();
     else if(pn==='panel-tb') renderTB();
     else if(pn==='panel-grid') setTimeout(scrollGridToCurrent,40);
+    else if(pn==='panel-fixtures') setTimeout(scrollFixturesToLatest,40);
     else if(pn==='panel-pools') renderPools();
     else if(pn==='panel-rank') renderRank();
     else if(pn==='panel-bracket') renderBracket();
