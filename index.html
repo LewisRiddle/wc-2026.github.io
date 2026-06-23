@@ -683,11 +683,13 @@ function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>
 const tabs=[['tab-standings','panel-standings'],['tab-grid','panel-grid'],['tab-fixtures','panel-fixtures'],['tab-proj','panel-proj'],['tab-tb','panel-tb'],['tab-pools','panel-pools'],['tab-rank','panel-rank'],['tab-bracket','panel-bracket']];
 function showTab(pn){
   tabs.forEach(([tt,pp])=>{document.getElementById(tt).setAttribute('aria-selected', pp===pn);document.getElementById(pp).hidden = pp!==pn;});
+  window.scrollTo(0,0);                       // always start a tab at the top
+  const tv=document.body.classList.contains('tv');
   try{
     if(pn==='panel-proj') renderProj();
     else if(pn==='panel-tb') renderTB();
-    else if(pn==='panel-grid') setTimeout(scrollGridToCurrent,40);
-    else if(pn==='panel-fixtures') setTimeout(scrollFixturesToLatest,40);
+    else if(pn==='panel-grid'){ if(!tv) setTimeout(scrollGridToCurrent,40); }
+    else if(pn==='panel-fixtures'){ if(!tv) setTimeout(scrollFixturesToLatest,40); }
     else if(pn==='panel-pools') renderPools();
     else if(pn==='panel-rank') renderRank();
     else if(pn==='panel-bracket') renderBracket();
@@ -697,7 +699,7 @@ tabs.forEach(([t,pn])=>document.getElementById(t).addEventListener('click',()=>{
 
 /* ---- TV mode: auto-rotate every tab on a timer + drift the grid ---- */
 const TV = location.hash.toLowerCase().includes('tv');
-let tvTimer=null, tvRAF=null, gridDrift=null, tvIdx=0;
+let tvTimer=null, tvRAF=null, gridDrift=null, pageDrift=null, tvIdx=0;
 const TV_SEQUENCE=[['panel-standings',12000],['panel-grid',16000],['panel-proj',12000],
   ['panel-pools',10000],['panel-rank',9000],['panel-tb',9000],['panel-fixtures',11000],['panel-bracket',13000]];
 function tvStep(){
@@ -705,11 +707,22 @@ function tvStep(){
   tvIdx=(tvIdx+1)%TV_SEQUENCE.length;
   clearTimeout(tvTimer);
   tvTimer=setTimeout(tvStep, ms);          // schedule next FIRST: a bad tab can never stall the loop
-  try{ showTab(pn); if(pn==='panel-grid') startGridDrift(ms); }catch(e){ console.warn('TV tab failed',pn,e); }
+  try{ showTab(pn); if(pn==='panel-grid') startGridDrift(ms); else startPageDrift(ms); }catch(e){ console.warn('TV tab failed',pn,e); }
   const bar=document.getElementById('tvbar'); const t0=performance.now();
   cancelAnimationFrame(tvRAF);
   (function tick(now){ const p=Math.min(1,(now-t0)/ms); if(bar) bar.style.width=(p*100)+'%';
     if(p<1) tvRAF=requestAnimationFrame(tick); })(t0);
+}
+function startPageDrift(ms){
+  clearInterval(pageDrift);
+  window.scrollTo(0,0);
+  const t0=performance.now(), hold=1400, run=Math.max(2000, ms-2800);
+  pageDrift=setInterval(()=>{
+    const max=document.documentElement.scrollHeight - window.innerHeight;
+    if(max<=4){ window.scrollTo(0,0); return; }   // fits on screen, nothing to drift
+    const p=Math.min(1, Math.max(0,(performance.now()-t0-hold)/run));
+    window.scrollTo(0, max*p);
+  }, 60);
 }
 function startGridDrift(ms){
   const wrap=document.getElementById('grid'); if(!wrap) return;
@@ -724,7 +737,7 @@ function startGridDrift(ms){
 }
 function startTV(){ document.body.classList.add('tv'); tvIdx=0; tvStep(); }
 function stopTV(){ document.body.classList.remove('tv'); clearTimeout(tvTimer); cancelAnimationFrame(tvRAF);
-  clearInterval(gridDrift); const b=document.getElementById('tvbar'); if(b) b.style.width='0'; }
+  clearInterval(gridDrift); clearInterval(pageDrift); window.scrollTo(0,0); const b=document.getElementById('tvbar'); if(b) b.style.width='0'; }
 document.getElementById('tvtag').addEventListener('click',()=>{ document.body.classList.contains('tv')?stopTV():startTV(); });
 if(TV){ document.body.classList.add('tv'); if(document.readyState==='complete') setTimeout(startTV,300); else window.addEventListener('load',()=>setTimeout(startTV,300)); }
 document.getElementById('card-close').onclick=()=>document.getElementById('card').close();
