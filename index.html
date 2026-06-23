@@ -201,6 +201,21 @@ body.tv .tvtag{display:inline-block}
 #boot .bs{font:500 12.5px Inter;color:var(--ink-soft);margin-top:-8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#boot .borbit::before{animation:none}}
+
+/* bracket */
+.bkt{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px}
+.bcol{flex:0 0 auto;width:205px;display:flex;flex-direction:column;gap:10px}
+.bcol h4{font:800 11px Inter;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:2px 0}
+.tie{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.tie .slot{display:flex;align-items:center;gap:7px;padding:8px 10px;font-size:13px;border-bottom:1px solid var(--line);min-height:34px}
+.tie .slot:last-of-type{border-bottom:0}
+.tie .slot.ph{color:var(--ink-soft);font-style:italic;font-size:12px}
+.tie .slot.win{background:var(--hitbg);font-weight:700;color:var(--pitch-dark)}
+.tie .slot.out{opacity:.55;text-decoration:line-through}
+.tie .tm{display:flex;align-items:center;justify-content:space-between;font:600 10px Inter;color:var(--ink-soft);padding:4px 10px;background:#F7F9FC}
+.prov{font:700 8.5px Inter;color:#B45309;background:#FCE4B6;border-radius:4px;padding:0 4px;margin-left:6px}
+.bnote{font-size:12px;color:var(--ink-soft);margin:10px 2px 0;max-width:760px}
+body.tv .bcol{width:230px}
 </style>
 </head>
 <body>
@@ -230,6 +245,7 @@ body.tv .tvtag{display:inline-block}
     <button class="tab" role="tab" id="tab-standings" aria-selected="true" aria-controls="panel-standings">Standings</button>
     <button class="tab" role="tab" id="tab-grid" aria-selected="false" aria-controls="panel-grid">Everyone's picks</button>
     <button class="tab" role="tab" id="tab-fixtures" aria-selected="false" aria-controls="panel-fixtures">Fixtures &amp; results</button>
+    <button class="tab" role="tab" id="tab-bracket" aria-selected="false" aria-controls="panel-bracket">Bracket</button>
     <button class="tab" role="tab" id="tab-proj" aria-selected="false" aria-controls="panel-proj">Who wins this?</button>
     <button class="tab" role="tab" id="tab-tb" aria-selected="false" aria-controls="panel-tb">Tie-breakers</button>
     <button class="tab" role="tab" id="tab-pools" aria-selected="false" aria-controls="panel-pools">Pools</button>
@@ -279,6 +295,11 @@ body.tv .tvtag{display:inline-block}
     <p class="section-title">FIFA world ranking &middot; all 48 nations at the finals</p>
     <div class="gridwrap" id="rankwrap"></div>
     <p class="projnote">Official FIFA/Coca-Cola World Ranking as of 11 June 2026 (Argentina just overtook France for top spot). FIFA only refreshes these after the tournament, next update 20 July, so they hold for the whole World Cup. "Grp" is each team's group.</p>
+  </section>
+
+  <section id="panel-bracket" role="tabpanel" hidden>
+    <p class="section-title">Knockout bracket &middot; fills in as groups finish and ties are played</p>
+    <div id="bracket"></div>
   </section>
 
   <p class="foot" id="foot"></p>
@@ -589,10 +610,59 @@ function renderRank(){
   }
   html+='</tbody></table>'; host.innerHTML=html;
 }
-function rerender(){renderStatus();renderLive();renderRace();renderGrid();renderFixtures();PROJ_KEY='';renderProj();renderTB();renderPools();renderRank();}
+let GT={};
+function groupTable(L){
+  const ms=FIX.filter(f=>f.stage==='Group'&&f.group===L);
+  const T={}; const ens=t=>{ if(!T[t])T[t]={team:t,pts:0,gf:0,ga:0,played:0}; return T[t]; };
+  for(const f of ms){ ens(f.home); ens(f.away); const sc=SCORES[f.n]; if(!sc) continue;
+    const m=/^(\d+)\s*-\s*(\d+)$/.exec(sc); if(!m) continue; const hs=+m[1],as=+m[2];
+    const H=T[f.home],A=T[f.away]; H.gf+=hs;H.ga+=as;A.gf+=as;A.ga+=hs;H.played++;A.played++;
+    if(hs>as)H.pts+=3; else if(hs<as)A.pts+=3; else {H.pts++;A.pts++;} }
+  const arr=Object.values(T).map(x=>({...x,gd:x.gf-x.ga}))
+    .sort((a,b)=> b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.team.localeCompare(b.team));
+  return {arr, complete: ms.length>0 && ms.every(f=>SCORES[f.n])};
+}
+function buildGroupTables(){ GT={}; for(const L of 'ABCDEFGHIJKL') GT[L]=groupTable(L); }
+function koResult(n){ const r=RESULTS[n]; return (r && r!=='Draw')? r : null; }
+function resolveSlot(label){
+  if(!label) return null; let m;
+  if(m=/^Winner Group ([A-L])$/.exec(label)){const t=GT[m[1]];return (t&&t.arr[0])?{team:t.arr[0].team,prov:!t.complete}:null;}
+  if(m=/^Runner-up Group ([A-L])$/.exec(label)){const t=GT[m[1]];return (t&&t.arr[1])?{team:t.arr[1].team,prov:!t.complete}:null;}
+  if(/3rd/i.test(label)) return null;
+  if(m=/^Winner Match (\d+)$/.exec(label)){const w=koResult(+m[1]);return w?{team:w,prov:false}:null;}
+  return null;
+}
+function prettyPH(label){ return String(label).replace('Runner-up Group','2nd Group').replace('Winner Group','1st Group')
+  .replace(/^3rd (.+)$/,'3rd place ($1)').replace('Winner Match','Winner of #').replace('Loser Match','Loser of #'); }
+function slotHTML(label,winnerName){
+  const r=resolveSlot(label);
+  if(r){ const win= winnerName && normName(winnerName)===normName(r.team);
+    const cls=win?' win':(winnerName?' out':'');
+    return '<div class="slot'+cls+'">'+flagImg(r.team,20)+esc(r.team)+(r.prov?'<span class="prov">prov</span>':'')+'</div>'; }
+  return '<div class="slot ph">'+esc(prettyPH(label))+'</div>';
+}
+function tieHTML(f){ const w=koResult(f.n),sc=SCORES[f.n];
+  return '<div class="tie">'+slotHTML(f.home,w)+slotHTML(f.away,w)+
+    '<div class="tm"><span>#'+f.n+'</span><span>'+esc((f.date||'').split(' ').slice(0,3).join(' '))+(sc?' \u00b7 '+esc(sc):'')+'</span></div></div>'; }
+function renderBracket(){
+  const host=document.getElementById('bracket'); if(!host||document.getElementById('panel-bracket').hidden) return;
+  buildGroupTables();
+  const rounds=[['Round of 32','Round of 32'],['Round of 16','Round of 16'],['Quarter Final','Quarter-finals'],['Semi Final','Semi-finals'],['Final','Final']];
+  let html='<div class="bkt">';
+  for(const [stage,title] of rounds){
+    const ms=FIX.filter(f=>f.stage===stage).sort((a,b)=>a.n-b.n);
+    html+='<div class="bcol"><h4>'+esc(title)+'</h4>'+ms.map(tieHTML).join('');
+    if(stage==='Final'){ const tp=FIX.find(f=>f.stage==='Third Place');
+      if(tp) html+='<h4 style="margin-top:8px">Third place</h4>'+tieHTML(tp); }
+    html+='</div>';
+  }
+  html+='</div><p class="bnote">Group winners and runners-up fill in automatically from live scores (<span class="prov">prov</span> means provisional until that group has finished). The eight best third-placed teams follow FIFA\u2019s official allocation, which only locks once every group is complete, so they stay as placeholders until then. Knockout slots advance as each tie is played.</p>';
+  host.innerHTML=html;
+}
+function rerender(){renderStatus();renderLive();renderRace();renderGrid();renderFixtures();PROJ_KEY='';renderProj();renderTB();renderPools();renderRank();renderBracket();}
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
-const tabs=[['tab-standings','panel-standings'],['tab-grid','panel-grid'],['tab-fixtures','panel-fixtures'],['tab-proj','panel-proj'],['tab-tb','panel-tb'],['tab-pools','panel-pools'],['tab-rank','panel-rank']];
+const tabs=[['tab-standings','panel-standings'],['tab-grid','panel-grid'],['tab-fixtures','panel-fixtures'],['tab-proj','panel-proj'],['tab-tb','panel-tb'],['tab-pools','panel-pools'],['tab-rank','panel-rank'],['tab-bracket','panel-bracket']];
 function showTab(pn){
   tabs.forEach(([tt,pp])=>{document.getElementById(tt).setAttribute('aria-selected', pp===pn);document.getElementById(pp).hidden = pp!==pn;});
   try{
@@ -601,6 +671,7 @@ function showTab(pn){
     else if(pn==='panel-grid') setTimeout(scrollGridToCurrent,40);
     else if(pn==='panel-pools') renderPools();
     else if(pn==='panel-rank') renderRank();
+    else if(pn==='panel-bracket') renderBracket();
   }catch(e){ console.warn('render failed for',pn,e); }
 }
 tabs.forEach(([t,pn])=>document.getElementById(t).addEventListener('click',()=>{ stopTV(); showTab(pn); }));
@@ -609,7 +680,7 @@ tabs.forEach(([t,pn])=>document.getElementById(t).addEventListener('click',()=>{
 const TV = location.hash.toLowerCase().includes('tv');
 let tvTimer=null, tvRAF=null, gridDrift=null, tvIdx=0;
 const TV_SEQUENCE=[['panel-standings',12000],['panel-grid',16000],['panel-proj',12000],
-  ['panel-pools',10000],['panel-rank',9000],['panel-tb',9000],['panel-fixtures',11000]];
+  ['panel-pools',10000],['panel-rank',9000],['panel-tb',9000],['panel-fixtures',11000],['panel-bracket',13000]];
 function tvStep(){
   const [pn,ms]=TV_SEQUENCE[tvIdx];
   tvIdx=(tvIdx+1)%TV_SEQUENCE.length;
