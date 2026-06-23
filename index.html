@@ -689,7 +689,7 @@ function showTab(pn){
     if(pn==='panel-proj') renderProj();
     else if(pn==='panel-tb') renderTB();
     else if(pn==='panel-grid'){ if(!tv) setTimeout(scrollGridToCurrent,40); }
-    else if(pn==='panel-fixtures'){ if(!tv) setTimeout(scrollFixturesToLatest,40); }
+    else if(pn==='panel-fixtures') setTimeout(scrollFixturesToLatest,40);
     else if(pn==='panel-pools') renderPools();
     else if(pn==='panel-rank') renderRank();
     else if(pn==='panel-bracket') renderBracket();
@@ -707,7 +707,13 @@ function tvStep(){
   tvIdx=(tvIdx+1)%TV_SEQUENCE.length;
   clearTimeout(tvTimer);
   tvTimer=setTimeout(tvStep, ms);          // schedule next FIRST: a bad tab can never stall the loop
-  try{ showTab(pn); if(pn==='panel-grid') startGridDrift(ms); else startPageDrift(ms); }catch(e){ console.warn('TV tab failed',pn,e); }
+  try{
+    showTab(pn);
+    clearInterval(pageDrift);
+    if(pn==='panel-grid') startGridDrift(ms);
+    else if(pn==='panel-fixtures') setTimeout(scrollFixturesToLatest,60);  // hold on the latest game, no drift
+    else startPageDrift(ms);
+  }catch(e){ console.warn('TV tab failed',pn,e); }
   const bar=document.getElementById('tvbar'); const t0=performance.now();
   cancelAnimationFrame(tvRAF);
   (function tick(now){ const p=Math.min(1,(now-t0)/ms); if(bar) bar.style.width=(p*100)+'%';
