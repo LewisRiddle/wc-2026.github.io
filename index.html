@@ -221,6 +221,11 @@ body.tv .tvtag{display:inline-block}
 .prov{font:700 8.5px Inter;color:#B45309;background:#FCE4B6;border-radius:4px;padding:0 4px;margin-left:6px}
 .bnote{font-size:12px;color:var(--ink-soft);margin:10px 2px 0;max-width:760px}
 body.tv .bcol{width:230px}
+
+/* TV: keep the current-game strip pinned at the top while the page drifts */
+body.tv #livewrap{position:sticky;top:4px;z-index:40;background:var(--paper);
+  padding:6px 0 8px;margin-bottom:8px;box-shadow:0 10px 16px -12px rgba(10,26,47,.4)}
+body.tv #livewrap:empty{display:none}
 </style>
 </head>
 <body>
@@ -730,6 +735,8 @@ function startPageDrift(ms){
     window.scrollTo(0, max*p);
   }, 60);
 }
+// keep the pinned live strip fresh while it's stuck up top
+
 function startGridDrift(ms){
   const wrap=document.getElementById('grid'); if(!wrap) return;
   clearInterval(gridDrift);
