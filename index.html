@@ -948,18 +948,22 @@ function renderLive(){
     }
     return;
   }
-  // nothing live: show next kickoff
+  // nothing live: show the next kickoff, and every game sharing that kickoff time
   const now=Date.now();
-  let nxt=null;
-  for(const f of FIX){ if(RESULTS[f.n]) continue; const t=parseNZT(f.date); if(t&&t>now-115*60000){ if(!nxt||t<nxt.t){nxt={f,t};} } }
-  if(nxt){
-    const f=nxt.f, sp=pickSplit(f);
-    const div=document.createElement('div');div.className='live';
-    div.innerHTML='<span class="badge next">Next up</span>'+
-      '<div class="lt"><span class="tm">'+flagImg(f.home)+esc(f.home)+'</span><span class="sc" style="font-size:15px;color:#9DB2C4">'+esc(f.date)+'</span><span class="tm">'+esc(f.away)+flagImg(f.away)+'</span></div>'+
-      '<div class="split">Pool: <b>'+sp.h+'</b> '+esc(shorten(f.home))+' \u00b7 <b>'+sp.d+'</b> draw \u00b7 <b>'+sp.a+'</b> '+esc(shorten(f.away))+
-      (f.venue?' \u00b7 '+esc(f.venue):'')+'</div>';
-    host.appendChild(div);
+  let minT=null;
+  for(const f of FIX){ if(RESULTS[f.n]) continue; const t=parseNZT(f.date); if(t&&t>now-115*60000){ if(minT===null||t<minT) minT=t; } }
+  if(minT!==null){
+    const upcoming=FIX.filter(f=>!RESULTS[f.n] && parseNZT(f.date)===minT).sort((a,b)=>a.n-b.n);
+    const many=upcoming.length>1;
+    upcoming.forEach((f,k)=>{
+      const sp=pickSplit(f);
+      const div=document.createElement('div');div.className='live';
+      div.innerHTML='<span class="badge next">'+(many?'Next up '+(k+1)+'/'+upcoming.length:'Next up')+'</span>'+
+        '<div class="lt"><span class="tm">'+flagImg(f.home)+esc(f.home)+'</span><span class="sc" style="font-size:15px;color:#9DB2C4">'+esc(many&&k>0?timeShort(f.date):f.date)+'</span><span class="tm">'+esc(f.away)+flagImg(f.away)+'</span></div>'+
+        '<div class="split">Pool: <b>'+sp.h+'</b> '+esc(shorten(f.home))+' \u00b7 <b>'+sp.d+'</b> draw \u00b7 <b>'+sp.a+'</b> '+esc(shorten(f.away))+
+        (f.venue?' \u00b7 '+esc(f.venue):'')+'</div>';
+      host.appendChild(div);
+    });
   }
 }
 
