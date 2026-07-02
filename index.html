@@ -230,6 +230,7 @@ body.tv #livewrap:empty{display:none}
 /* team drill-down */
 .teamlink{cursor:pointer}
 .teamlink:hover{text-decoration:underline}
+.live .tm.teamlink:hover{opacity:.85}
 .tsum{font:700 13px Inter;color:var(--ink);margin:2px 0 12px}
 .trow{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px}
 .trow:last-child{border-bottom:0}
@@ -397,7 +398,7 @@ function renderGrid(){
     if(f.stage!==curStage){curStage=f.stage;
       html+='<tr class="stagehdr"><td colspan="'+(PLAYERS.length+1)+'">'+esc(f.stage)+'</td></tr>';}
     const res=RESULTS[f.n];
-    html+='<tr data-n="'+f.n+'" class="'+(res?'done':'')+'"><td class="match"><span class="mt">'+flagImg(f.home,20)+esc(f.home)+' v '+flagImg(f.away,20)+esc(f.away)+'</span>'+
+    html+='<tr data-n="'+f.n+'" class="'+(res?'done':'')+'"><td class="match"><span class="mt"><span class="teamlink" data-team="'+esc(f.home)+'">'+flagImg(f.home,20)+esc(f.home)+'</span> v <span class="teamlink" data-team="'+esc(f.away)+'">'+flagImg(f.away,20)+esc(f.away)+'</span></span>'+
       '<br><span class="ms">'+(f.group?'Grp '+f.group+' \u00b7 ':'')+esc(f.date||'')+(res?' \u00b7 <b>'+esc(res==='Draw'?'Draw':res)+'</b>':'')+'</span></td>';
     for(const p of PLAYERS){
       const pick=p.picks[String(f.n)]||'';
@@ -983,7 +984,7 @@ function renderLive(){
       const sp=f? pickSplit(f):null;
       const div=document.createElement('div');div.className='live';
       div.innerHTML='<span class="badge">Live</span>'+
-        '<div class="lt"><span class="tm">'+flagImg(g.home)+esc(g.home)+'</span><span class="sc">'+esc(String(g.hs))+'\u2013'+esc(String(g.as))+'</span><span class="tm">'+esc(g.away)+flagImg(g.away)+'</span></div>'+
+        '<div class="lt"><span class="tm teamlink" data-team="'+esc(g.home)+'">'+flagImg(g.home)+esc(g.home)+'</span><span class="sc">'+esc(String(g.hs))+'\u2013'+esc(String(g.as))+'</span><span class="tm teamlink" data-team="'+esc(g.away)+'">'+esc(g.away)+flagImg(g.away)+'</span></div>'+
         '<span class="clock">'+esc(g.clock)+'</span>'+
         (sp?'<div class="split">Pool: <b>'+sp.h+'</b> '+esc(shorten(g.home))+' \u00b7 <b>'+sp.d+'</b> draw \u00b7 <b>'+sp.a+'</b> '+esc(shorten(g.away))+'</div>':'')+
         (g.n&&ODDS[g.n]?'<div class="odds">Odds: '+esc(shorten(g.home))+' <b>'+(ODDS[g.n].h?ODDS[g.n].h.toFixed(2):'\u2013')+'</b> \u00b7 draw <b>'+(ODDS[g.n].d?ODDS[g.n].d.toFixed(2):'\u2013')+'</b> \u00b7 '+esc(shorten(g.away))+' <b>'+(ODDS[g.n].a?ODDS[g.n].a.toFixed(2):'\u2013')+'</b> <span class="src">DraftKings</span></div>':'')+
@@ -1003,7 +1004,7 @@ function renderLive(){
       const sp=pickSplit(f);
       const div=document.createElement('div');div.className='live';
       div.innerHTML='<span class="badge next">'+(many?'Next up '+(k+1)+'/'+upcoming.length:'Next up')+'</span>'+
-        '<div class="lt"><span class="tm">'+flagImg(f.home)+esc(f.home)+'</span><span class="sc" style="font-size:15px;color:#9DB2C4">'+esc(many&&k>0?timeShort(f.date):f.date)+'</span><span class="tm">'+esc(f.away)+flagImg(f.away)+'</span></div>'+
+        '<div class="lt"><span class="tm teamlink" data-team="'+esc(f.home)+'">'+flagImg(f.home)+esc(f.home)+'</span><span class="sc" style="font-size:15px;color:#9DB2C4">'+esc(many&&k>0?timeShort(f.date):f.date)+'</span><span class="tm teamlink" data-team="'+esc(f.away)+'">'+esc(f.away)+flagImg(f.away)+'</span></div>'+
         '<div class="split">Pool: <b>'+sp.h+'</b> '+esc(shorten(f.home))+' \u00b7 <b>'+sp.d+'</b> draw \u00b7 <b>'+sp.a+'</b> '+esc(shorten(f.away))+
         (f.venue?' \u00b7 '+esc(f.venue):'')+'</div>';
       host.appendChild(div);
