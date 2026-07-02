@@ -226,6 +226,18 @@ body.tv .bcol{width:230px}
 body.tv #livewrap{position:sticky;top:4px;z-index:40;background:var(--paper);
   padding:6px 0 8px;margin-bottom:8px;box-shadow:0 10px 16px -12px rgba(10,26,47,.4)}
 body.tv #livewrap:empty{display:none}
+
+/* team drill-down */
+.teamlink{cursor:pointer}
+.teamlink:hover{text-decoration:underline}
+.tsum{font:700 13px Inter;color:var(--ink);margin:2px 0 12px}
+.trow{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.trow:last-child{border-bottom:0}
+.trow .ts{font:700 10px Inter;letter-spacing:.04em;color:var(--ink-soft);width:38px;flex:none}
+.trow .topp{flex:1;display:flex;align-items:center;gap:6px}
+.trow .tsc{font-weight:700;color:var(--ink);white-space:nowrap}
+.wdl{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:4px;font:800 10px Inter;color:#fff;flex:none}
+.wdl.w{background:var(--pitch)}.wdl.d{background:#9aa7b4}.wdl.l{background:#C2410C}.wdl.up{background:var(--line);color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -454,7 +466,7 @@ function renderFixtures(){
     const sc=SCORES[f.n];
     fx.innerHTML='<div class="gp">'+(f.group||'')+'</div>'+
       (res?'<span class="ft">\u2714 FT</span>':'')+
-      '<div class="teams"><span class="t'+hw+'">'+flagImg(f.home,20)+esc(f.home)+'</span><span class="vs">v</span><span class="t'+aw+'">'+flagImg(f.away,20)+esc(f.away)+'</span>'+
+      '<div class="teams"><span class="t'+hw+' teamlink" data-team="'+esc(f.home)+'">'+flagImg(f.home,20)+esc(f.home)+'</span><span class="vs">v</span><span class="t'+aw+' teamlink" data-team="'+esc(f.away)+'">'+flagImg(f.away,20)+esc(f.away)+'</span>'+
       (res==='Draw'?' <span class="drawpill">Draw</span>':'')+(sc?' <span class="scline">'+esc(sc)+'</span>':'')+'</div>'+
       '<div class="meta">'+(res?'<span class="res">Full time</span>':'<span class="pend">'+timeShort(f.date)+'</span>')+gotit+
       (!res&&ODDS[f.n]?'<span class="gotit">TAB: '+[ODDS[f.n].h,ODDS[f.n].d,ODDS[f.n].a].map(x=>x?x.toFixed(2):'\u2013').join(' / ')+'</span>':'')+'</div>';
@@ -662,7 +674,7 @@ function slotHTML(label,winnerName){
   const r=resolveSlot(label);
   if(r){ const win= winnerName && normName(winnerName)===normName(r.team);
     const cls=win?' win':(winnerName?' out':'');
-    return '<div class="slot'+cls+'">'+flagImg(r.team,20)+esc(r.team)+(r.prov?'<span class="prov">prov</span>':'')+'</div>'; }
+    return '<div class="slot'+cls+' teamlink" data-team="'+esc(r.team)+'">'+flagImg(r.team,20)+esc(r.team)+(r.prov?'<span class="prov">prov</span>':'')+'</div>'; }
   if(!isPlaceholder(label)){ // a real, already-known team (e.g. Round of 32 now resolved)
     const win= winnerName && normName(winnerName)===normName(label);
     const cls=win?' win':(winnerName?' out':'');
@@ -758,6 +770,33 @@ function stopTV(){ document.body.classList.remove('tv'); clearTimeout(tvTimer); 
   clearInterval(gridDrift); clearInterval(pageDrift); window.scrollTo(0,0); const b=document.getElementById('tvbar'); if(b) b.style.width='0'; }
 document.getElementById('tvtag').addEventListener('click',()=>{ document.body.classList.contains('tv')?stopTV():startTV(); });
 if(TV){ document.body.classList.add('tv'); if(document.readyState==='complete') setTimeout(startTV,300); else window.addEventListener('load',()=>setTimeout(startTV,300)); }
+function stageShort(s){return ({'Group':'Grp','Round of 32':'R32','Round of 16':'R16','Quarter Final':'QF','Semi Final':'SF','Third Place':'3rd','Final':'Final'})[s]||s;}
+function openTeam(team){
+  const games=FIX.filter(f=>normName(f.home)===normName(team)||normName(f.away)===normName(team)).sort((a,b)=>a.n-b.n);
+  let P=0,W=0,D=0,L=0,GF=0,GA=0,rows='';
+  for(const f of games){
+    const home=normName(f.home)===normName(team);
+    const opp=home?f.away:f.home;
+    const res=RESULTS[f.n], sc=SCORES[f.n];
+    let scoreTxt='',outcome='',cls='';
+    if(res){
+      if(sc){const mm=/^(\d+)\s*-\s*(\d+)$/.exec(sc); if(mm){const us=home?+mm[1]:+mm[2], them=home?+mm[2]:+mm[1]; scoreTxt=us+'\u2013'+them; GF+=us; GA+=them;}}
+      P++;
+      if(res==='Draw'){D++;outcome='D';cls='d';}
+      else if(normName(res)===normName(team)){W++;outcome='W';cls='w';}
+      else {L++;outcome='L';cls='l';}
+    }
+    rows+='<div class="trow"><span class="ts">'+esc(stageShort(f.stage))+'</span>'+
+      '<span class="topp">'+(res?'<span class="wdl '+cls+'">'+outcome+'</span>':'<span class="wdl up">\u2022</span>')+
+      'v '+flagImg(opp,18)+esc(opp)+'</span>'+
+      '<span class="tsc">'+(res?(scoreTxt||'FT'):esc((f.date||'').split(' ').slice(0,3).join(' ')))+'</span></div>';
+  }
+  const summary=P?(P+' played &middot; '+W+'W '+D+'D '+L+'L &middot; goals '+GF+'\u2013'+GA):'No games played yet';
+  document.getElementById('card-name').innerHTML=flagImg(team,24)+' '+esc(team);
+  document.getElementById('card-body').innerHTML='<div class="tsum">'+summary+'</div>'+(rows||'<div class="tsum">No fixtures found.</div>');
+  document.getElementById('card').showModal();
+}
+document.addEventListener('click',e=>{const el=e.target.closest('.teamlink'); if(el&&el.dataset.team){ e.preventDefault(); openTeam(el.dataset.team); }});
 document.getElementById('card-close').onclick=()=>document.getElementById('card').close();
 
 async function loadResults(){
